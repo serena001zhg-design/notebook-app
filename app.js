@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://notebook-backend-xh7d.onrender.com/api';
+const API_BASE = 'https://notebook-backend-xh7d.onrender.com/api';
 
 let folders = [];
 let currentFolder = null;
