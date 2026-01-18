@@ -258,11 +258,76 @@
         .folder-action-btn:hover {
             color: white;
         }
+        .search-box {
+             display: flex;
+             gap: 8px;
+             padding: 10px 15px;
+             background: #1a252f;
+        }
+        #searchInput {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        #searchBtn {
+            padding: 8px 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #searchBtn:hover {
+            background: #2980b9;
+        }
+        .search-results {
+            background: #34495e;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .search-results:empty {
+            display: none;
+        }
+        .search-result-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2c3e50;
+            cursor: pointer;
+        }
+        .search-result-item:hover {
+            background: #3498db;
+        }
+        .search-result-title {
+            color: white;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .search-result-folder {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-bottom: 4px;
+        }
+        .search-result-preview {
+            font-size: 12px;
+            color: #95a5a6;
+        }
+        .search-highlight {
+             background: #f1c40f;
+             color: #2c3e50;
+             padding: 0 2px;
+             border-radius: 2px;
+        }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <div class="sidebar-header">📓 我的笔记本</div>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="搜索笔记...">
+            <button id="searchBtn" onclick="performSearch()">🔍</button>
+        </div>
+        <div id="searchResults" class="search-results"></div>
         <div class="folder-list" id="folderList"></div>
         <button class="add-folder-btn" onclick="showAddFolderModal()">+ 新建文件夹</button>
     </div>
@@ -311,4 +376,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
