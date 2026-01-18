@@ -27,7 +27,7 @@ function renderFolders() {
     const list = document.getElementById('folderList');
     list.innerHTML = folders.map(folder => `
         <div class="folder-item ${currentFolder && currentFolder._id === folder._id ? 'active' : ''}" 
-             onclick="selectFolder('${folder._id}')">
+             onclick="selectFolder('${folder._id}')" data-id="${folder._id}">
             <span class="folder-name">
                 <span>📁</span>
                 <span>${folder.name}</span>
@@ -75,7 +75,7 @@ function renderNotes() {
     }
     list.innerHTML = notes.map(note => `
         <div class="note-item ${currentNote && currentNote._id === note._id ? 'active' : ''}" 
-             onclick="selectNote('${note._id}')">
+             onclick="selectNote('${note._id}')" data-id="${note._id}">
             <div class="note-item-title">${note.title || '无标题'}</div>
             <div class="note-item-preview">${note.content ? note.content.substring(0, 50) : '无内容'}</div>
             <div class="note-item-date">${new Date(note.updatedAt).toLocaleString('zh-CN')}</div>
@@ -119,7 +119,7 @@ async function createNote() {
         document.getElementById('deleteNoteBtn').style.display = 'block';
         document.getElementById('noteTitle').focus();
         
-        loadFolders(); // 更新笔记数量
+        loadFolders();
     } catch (error) {
         console.error('创建笔记失败:', error);
     }
@@ -167,7 +167,7 @@ async function deleteNote() {
         renderNotes();
         
         document.getElementById('noteEditor').style.display = 'none';
-        loadFolders(); // 更新笔记数量
+        loadFolders();
     } catch (error) {
         console.error('删除失败:', error);
     }
@@ -205,14 +205,12 @@ async function saveFolder() {
     
     try {
         if (editingFolderId) {
-            // 更新
             await fetch(`${API_BASE}/folders/${editingFolderId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
             });
         } else {
-            // 新建
             await fetch(`${API_BASE}/folders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -247,12 +245,17 @@ async function deleteFolder(folderId) {
         }
         
         loadFolders();
-        // ===== 搜索功能 =====
+    } catch (error) {
+        console.error('删除文件夹失败:', error);
+    }
+}
+
+// ===== 搜索功能 =====
 document.getElementById('searchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') performSearch();
 });
 
-async function performSearch() {
+function performSearch() {
     const keyword = document.getElementById('searchInput').value.trim();
     if (!keyword) {
         document.getElementById('searchResults').innerHTML = '';
@@ -262,92 +265,75 @@ async function performSearch() {
     const resultsDiv = document.getElementById('searchResults');
     resultsDiv.innerHTML = '<div style="padding:15px;color:#bdc3c7;">搜索中...</div>';
 
-    try {
-        const foldersRes = await fetch(`${API_BASE}/folders`);
-        const folders = await foldersRes.json();
+    fetch(`${API_BASE}/folders`)
+        .then(res => res.json())
+        .then(foldersData => {
+            fetch(`${API_BASE}/notes`)
+                .then(res => res.json())
+                .then(allNotes => {
+                    const results = allNotes.filter(note => 
+                        note.title.toLowerCase().includes(keyword.toLowerCase()) ||
+                        note.content.toLowerCase().includes(keyword.toLowerCase())
+                    );
 
-        const notesRes = await fetch(`${API_BASE}/notes`);
-        const allNotes = await notesRes.json();
+                    if (results.length === 0) {
+                        resultsDiv.innerHTML = '<div style="padding:15px;color:#bdc3c7;">没有找到匹配的笔记</div>';
+                        return;
+                    }
 
-        const results = allNotes.filter(note => 
-            note.title.toLowerCase().includes(keyword.toLowerCase()) ||
-            note.content.toLowerCase().includes(keyword.toLowerCase())
-        );
+                    resultsDiv.innerHTML = results.map(note => {
+                        const folder = foldersData.find(f => f._id === note.folderId);
+                        const folderName = folder ? folder.name : '未知文件夹';
+                        
+                        let preview = note.content.substring(0, 80);
+                        if (note.content.length > 80) preview += '...';
 
-        if (results.length === 0) {
-            resultsDiv.innerHTML = '<div style="padding:15px;color:#bdc3c7;">没有找到匹配的笔记</div>';
-            return;
-        }
+                        const highlightRegex = new RegExp(`(${keyword})`, 'gi');
+                        const highlightedTitle = note.title.replace(highlightRegex, '<span class="search-highlight">$1</span>');
+                        const highlightedPreview = preview.replace(highlightRegex, '<span class="search-highlight">$1</span>');
 
-        resultsDiv.innerHTML = results.map(note => {
-            const folder = folders.find(f => f._id === note.folderId);
-            const folderName = folder ? folder.name : '未知文件夹';
-            
-            let preview = note.content.substring(0, 80);
-            if (note.content.length > 80) preview += '...';
-
-            const highlightRegex = new RegExp(`(${keyword})`, 'gi');
-            const highlightedTitle = note.title.replace(highlightRegex, '<span class="search-highlight">$1</span>');
-            const highlightedPreview = preview.replace(highlightRegex, '<span class="search-highlight">$1</span>');
-
-            return `
-                <div class="search-result-item" onclick="openSearchResult('${note.folderId}', '${note._id}')">
-                    <div class="search-result-title">${highlightedTitle}</div>
-                    <div class="search-result-folder">📁 ${folderName}</div>
-                    <div class="search-result-preview">${highlightedPreview}</div>
-                </div>
-            `;
-        }).join('');
-
-    } catch (err) {
-        resultsDiv.innerHTML = '<div style="padding:15px;color:#e74c3c;">搜索失败</div>';
-    }
+                        return `
+                            <div class="search-result-item" onclick="openSearchResult('${note.folderId}', '${note._id}')">
+                                <div class="search-result-title">${highlightedTitle}</div>
+                                <div class="search-result-folder">📁 ${folderName}</div>
+                                <div class="search-result-preview">${highlightedPreview}</div>
+                            </div>
+                        `;
+                    }).join('');
+                })
+                .catch(err => {
+                    resultsDiv.innerHTML = '<div style="padding:15px;color:#e74c3c;">搜索失败</div>';
+                });
+        })
+        .catch(err => {
+            resultsDiv.innerHTML = '<div style="padding:15px;color:#e74c3c;">搜索失败</div>';
+        });
 }
 
-async function openSearchResult(folderId, noteId) {
+function openSearchResult(folderId, noteId) {
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('searchInput').value = '';
 
-    currentFolderId = folderId;
+    currentFolder = folders.find(f => f._id === folderId);
     
-    const foldersRes = await fetch(`${API_BASE}/folders`);
-    const folders = await foldersRes.json();
-    const folder = folders.find(f => f._id === folderId);
-    
-    if (folder) {
-        document.getElementById('currentFolderName').textContent = folder.name;
+    if (currentFolder) {
+        document.getElementById('currentFolderName').textContent = currentFolder.name;
+        document.getElementById('newNoteBtn').style.display = 'block';
+        document.getElementById('notesList').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
     }
 
-    document.querySelectorAll('.folder-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.id === folderId) {
-            item.classList.add('active');
+    renderFolders();
+
+    loadNotes(folderId).then(() => {
+        currentNote = notes.find(n => n._id === noteId);
+        
+        if (currentNote) {
+            document.getElementById('noteTitle').value = currentNote.title;
+            document.getElementById('noteContent').value = currentNote.content;
+            document.getElementById('noteEditor').style.display = 'flex';
+            document.getElementById('deleteNoteBtn').style.display = 'block';
+            renderNotes();
         }
     });
-
-    await loadNotes(folderId);
-
-    currentNoteId = noteId;
-    const notesRes = await fetch(`${API_BASE}/notes?folderId=${folderId}`);
-    const notes = await notesRes.json();
-    const note = notes.find(n => n._id === noteId);
-    
-    if (note) {
-        document.getElementById('noteTitle').value = note.title;
-        document.getElementById('noteContent').value = note.content;
-        document.getElementById('noteEditor').style.display = 'flex';
-        document.getElementById('deleteNoteBtn').style.display = 'block';
-    }
-
-    document.querySelectorAll('.note-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.id === noteId) {
-            item.classList.add('active');
-        }
-    });
-}
-    } catch (error) {
-        console.error('删除文件夹失败:', error);
-    }
-
 }
