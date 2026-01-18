@@ -247,7 +247,107 @@ async function deleteFolder(folderId) {
         }
         
         loadFolders();
+        // ===== 搜索功能 =====
+document.getElementById('searchInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') performSearch();
+});
+
+async function performSearch() {
+    const keyword = document.getElementById('searchInput').value.trim();
+    if (!keyword) {
+        document.getElementById('searchResults').innerHTML = '';
+        return;
+    }
+
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<div style="padding:15px;color:#bdc3c7;">搜索中...</div>';
+
+    try {
+        const foldersRes = await fetch(`${API_BASE}/folders`);
+        const folders = await foldersRes.json();
+
+        const notesRes = await fetch(`${API_BASE}/notes`);
+        const allNotes = await notesRes.json();
+
+        const results = allNotes.filter(note => 
+            note.title.toLowerCase().includes(keyword.toLowerCase()) ||
+            note.content.toLowerCase().includes(keyword.toLowerCase())
+        );
+
+        if (results.length === 0) {
+            resultsDiv.innerHTML = '<div style="padding:15px;color:#bdc3c7;">没有找到匹配的笔记</div>';
+            return;
+        }
+
+        resultsDiv.innerHTML = results.map(note => {
+            const folder = folders.find(f => f._id === note.folderId);
+            const folderName = folder ? folder.name : '未知文件夹';
+            
+            let preview = note.content.substring(0, 80);
+            if (note.content.length > 80) preview += '...';
+
+            const highlightRegex = new RegExp(`(${keyword})`, 'gi');
+            const highlightedTitle = note.title.replace(highlightRegex, '<span class="search-highlight">$1</span>');
+            const highlightedPreview = preview.replace(highlightRegex, '<span class="search-highlight">$1</span>');
+
+            return `
+                <div class="search-result-item" onclick="openSearchResult('${note.folderId}', '${note._id}')">
+                    <div class="search-result-title">${highlightedTitle}</div>
+                    <div class="search-result-folder">📁 ${folderName}</div>
+                    <div class="search-result-preview">${highlightedPreview}</div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        resultsDiv.innerHTML = '<div style="padding:15px;color:#e74c3c;">搜索失败</div>';
+    }
+}
+
+async function openSearchResult(folderId, noteId) {
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('searchInput').value = '';
+
+    currentFolderId = folderId;
+    
+    const foldersRes = await fetch(`${API_BASE}/folders`);
+    const folders = await foldersRes.json();
+    const folder = folders.find(f => f._id === folderId);
+    
+    if (folder) {
+        document.getElementById('currentFolderName').textContent = folder.name;
+    }
+
+    document.querySelectorAll('.folder-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.id === folderId) {
+            item.classList.add('active');
+        }
+    });
+
+    await loadNotes(folderId);
+
+    currentNoteId = noteId;
+    const notesRes = await fetch(`${API_BASE}/notes?folderId=${folderId}`);
+    const notes = await notesRes.json();
+    const note = notes.find(n => n._id === noteId);
+    
+    if (note) {
+        document.getElementById('noteTitle').value = note.title;
+        document.getElementById('noteContent').value = note.content;
+        document.getElementById('noteEditor').style.display = 'flex';
+        document.getElementById('deleteNoteBtn').style.display = 'block';
+    }
+
+    document.querySelectorAll('.note-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.id === noteId) {
+            item.classList.add('active');
+        }
+    });
+}
     } catch (error) {
         console.error('删除文件夹失败:', error);
     }
+
 }
